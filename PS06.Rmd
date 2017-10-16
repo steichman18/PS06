@@ -1,6 +1,6 @@
 ---
 title: "STAT/MATH 495: Problem Set 06"
-author: "WRITE YOUR NAME HERE"
+author: "Sarah Teichman"
 date: "2017-10-17"
 output:
   html_document:
@@ -30,7 +30,7 @@ library(knitr)
 
 # Collaboration
 
-Please indicate who you collaborated with on this assignment: 
+Please indicate who you collaborated with on this assignment: Jonathan
 
 
 
@@ -96,41 +96,59 @@ n_sample <- 10000
 # Computation
 
 ```{r}
-
+do_stuff <- function(df,f,n,sigma) {
+  samp <- generate_sample(f,n,sigma)
+  mod <- smooth.spline(samp$x,samp$y,df=df)
+  pred <- predict(mod,0.95)[[2]]
+  return(pred)
+}
+df2 <- numeric(n_sample)
+df99 <- numeric(n_sample)
+pred_df2 <- replicate(n_sample,do_stuff(df=2,f=f,n=n,sigma=sigma))
+pred_df99 <- replicate(n_sample,do_stuff(df=99,f=f,n=n,sigma=sigma))
+pred_df2 <- data.frame(pred_df2)
+pred_df99 <- data.frame(pred_df99)
+f_x <- rep(.95^2, n_sample)
+epsilon <- rnorm(n_sample,0,sigma)
+y <- f_x + epsilon
+df_2 <- pred_df2 %>%
+  summarise(mse = mean((pred_df2-y)^2),
+            bias_sq = mean((pred_df2)-f_x)^2,
+            variance = mean((pred_df2-mean(pred_df2))^2),
+            irreducible = (sigma^2),
+            sum = bias_sq+variance+irreducible)
+df_99 <- pred_df99 %>%
+  summarise(mse = mean((pred_df99-y)^2),
+            bias_sq = mean((pred_df99)-f_x)^2,
+            variance = mean((pred_df99-mean(pred_df99))^2),
+            irreducible = (sigma^2),
+            sum = bias_sq+variance+irreducible)
+df_all <- rbind(df_2,df_99)
+rownames(df_all) <- c('lm','spline df=99')
 ```
-
 
 # Tables
 
-As done in Lec 2.7, for both
-
-* An `lm` regression AKA a `smooth.splines(x, y, df=2)` model fit 
-* A `smooth.splines(x, y, df=99)` model fit 
-
-output tables comparing:
-
-|  MSE| bias_squared|   var| irreducible|   sum|
-|----:|------------:|-----:|-----------:|-----:|
-|     X|           X  |     X |      X |         X |
-
-where `sum = bias_squared + var + irreducible`. You can created cleanly formatted tables like the one above by piping a data frame into `knitr::kable(digits=4)`.
-
-
-
+```{r}
+df_all %>%
+  knitr::kable(digits=4)
+```
 
 # Analysis
 
 **Questions**:
 
 1. Based on the topics covered in Lec 2.7, name one possible "sanity check" for your results. Name another if you can.
-1. In **two** sentences or less, give a rough sketch of what the procedure would
+2. In **two** sentences or less, give a rough sketch of what the procedure would
 be to get the breakdown of $$\mbox{MSE}\left[\widehat{f}(x)\right]$$ for *all*
 $x$ in this example, and not just for $$\mbox{MSE}\left[\widehat{f}(x_0)\right]
 = \mbox{MSE}\left[\widehat{f}(0.95)\right]$$.
-1. Which of the two models would you choose for predicting the point of interest and why?
+3. Which of the two models would you choose for predicting the point of interest and why?
 
 **Answers**:
 
-1.
-1.
-1.
+1. One sanity check could be to plot the two spline models for a random sample of 100 of the 10000 times I ran through the process of generating predictions, and to plot the true underlyng curve. For df=2, there would be low variance but the points would not line up exactly with the true curve, and for df=99, there would be much higher variance but the points would be clustered around $0.95^2$. Another much more expensive sanity check would be to redo the entire process with a different value of sigma. If the sample size is large enough, the bias and variance should stay relatively constant (although the estimates would be less precise) but the mse and irreducible error would increase. This would show which parts of the process are random/depend on the exact points and which parts are more systematic.
+
+2. I would calculate each component by taking the mean of the error component estimate for each the 10,000 samples. The MSE estimates would come from the differences between the 500 y values for the data points, and their corresponding predictions from the model, and the bias and variance would be similar but comparing the distributions of the predicted values over the 10,000 samples.
+
+3. I would use the lm model because it has a lower MSE. Even though it has higher bias, it has lower variance and that low variance keeps the prediction from being too far away from the true value. However, if I were trying to find an optimal model I would try an intermediate number of degrees of freedom in order to reduce the the sum of the squared bias and variance as much as possible. 
